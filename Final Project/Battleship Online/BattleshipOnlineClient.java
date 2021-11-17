@@ -1,4 +1,5 @@
 import java.io.*;
+import java.net.*;
 import java.util.*;
 import javafx.application.*;
 import javafx.geometry.*;
@@ -18,13 +19,14 @@ public class BattleshipOnlineClient extends Application
 	private boolean isReady = false;
 	
 	// Create and initialize cells
-	private Cell[][] grid = new Cell[10][10];
+	private PlayerCell[][] playerGrid = new PlayerCell[10][10];
+	private EnemyCell[][] enemyGrid = new EnemyCell[10][10];
 	
 	// Create and initialize a title label
 	private Label lblTitle = new Label();
 	
 	// Create and initialize a log text area
-	private TextArea log = new TextArea();
+	private TextArea taLog = new TextArea();
 	
 	// Indicate selected row and column by the current move
 	private int rowSelected;
@@ -50,8 +52,11 @@ public class BattleshipOnlineClient extends Application
 	Ship submarine = new Ship(3, false, "Submarine");
 	Ship patrolBoat = new Ship(2, false, "Patrol Boat");
 	
-	// Create ArrayList to store ships
+	// Create ArrayList to store ships for prep phase
 	ArrayList<Ship> shipsToBePlaced = new ArrayList<>();
+	
+	// Create ArrayList for store ships that haven't been sunk
+	ArrayList<Ship> shipsToBeSunk = new ArrayList<>();
 	
 	// Selected ship to place on grid
 	Ship selectedShip = null;
@@ -77,8 +82,8 @@ public class BattleshipOnlineClient extends Application
 		lblEnemyGrid.setContentDisplay(ContentDisplay.BOTTOM);
 		for (int i = 0; i < 10; i++) {
 			for (int j = 0; j < 10; j++) {
-				playerGridPane.add(grid[i][j] = new Cell(i, j), j, i);
-				enemyGridPane.add(grid[i][j] = new Cell(i, j), j, i);
+				playerGridPane.add(playerGrid[i][j] = new PlayerCell(i, j), j, i);
+				enemyGridPane.add(enemyGrid[i][j] = new EnemyCell(i, j), j, i);
 			}
 		}
 		// Set grid constraints
@@ -97,12 +102,18 @@ public class BattleshipOnlineClient extends Application
 			enemyGridPane.getRowConstraints().add(rowConst);
 		}
 		
-		// Add ships to ArrayList
+		// Add ships to ArrayLists
 		shipsToBePlaced.add(carrier);
 		shipsToBePlaced.add(battleship);
 		shipsToBePlaced.add(destroyer);
 		shipsToBePlaced.add(submarine);
 		shipsToBePlaced.add(patrolBoat);
+		
+		shipsToBeSunk.add(carrier);
+		shipsToBeSunk.add(battleship);
+		shipsToBeSunk.add(destroyer);
+		shipsToBeSunk.add(submarine);
+		shipsToBeSunk.add(patrolBoat);
 				
 		// Add ships to splitpane
 		StackPane stackPane = new StackPane();
@@ -170,13 +181,14 @@ public class BattleshipOnlineClient extends Application
 		
 		btReady.setOnAction(e -> {
 			if (shipsToBePlaced.isEmpty()) {
-				pageTransition(playerSplitPane, enemyGridPane, stackPane, bottomBox, btReady, lblTitle);
+				pageTransition(playerSplitPane, enemyGridPane, stackPane, 
+						bottomBox, btReady, lblTitle, isReady);
 			}
 			else {
-				System.out.println("Please place down all ships");
+				taLog.appendText("Place down all ships before readying up \n");
 			}
 		});
-		btQuit.setOnAction(e -> System.exit(0));
+		btQuit.setOnAction(e -> continueToPlay = false);
 		
 		/* End prep stage */
 		
@@ -191,36 +203,117 @@ public class BattleshipOnlineClient extends Application
 	}
 	
 	private void connectToServer() {
-		
-	}
-	
-	/* Handle 'ready' button pressed */
-	public void pageTransition(SplitPane playerSplitPane, GridPane enemyGridPane, 
-			StackPane stackPane, HBox box, Button button, Label title) {
-		// Replace stackPane with enemyGridPane in playerSplitPane
-		playerSplitPane.getItems().remove(stackPane);
-		playerSplitPane.getItems().add(enemyGridPane);
-		
-		// Remove button from box
-		box.getChildren().remove(button);
-		
-		// Change page title
-		title.setText("Battle Phase");
-	}
-	
-	// Creates and returns a button that represents a ship
-		public RadioButton shipButton(HBox box, Ship ship) {
-			for (int i = 0; i < ship.getLength(); i++) {
-				box.getChildren().add(new Rectangle(30, 30));
-				box.setAlignment(Pos.CENTER);
-			}
-			RadioButton rbNew = new RadioButton(ship.getName());
-			box.getChildren().add(rbNew);
-			return rbNew;
+		try {
+			// Create a socket to connect to the server
+			Socket socket = new Socket(host, 8000);
+			
+			// Create an input stream to receive data from the server
+			fromServer = new DataInputStream(socket.getInputStream());
+			
+			// Create an output stream to send data to the server
+			toServer = new DataOutputStream(socket.getOutputStream());
 		}
+		catch (Exception ex) {
+			ex.printStackTrace();
+		}
+		
+		// Control the game on a separate thread
+		new Thread(() -> {
+			try {
+				// Get notification from the server
+				int player = fromServer.readInt();
+				
+				// Am I player 1 or 2?
+				if (player == PLAYER1) {
+					Platform.runLater(() -> {
+						lblTitle.setText("Player 1");
+						taLog.appendText("Player 1 joined \n");
+						taLog.appendText("Waiting for player 2 to join \n");
+					});
+					
+					// Receive startup notification from the server
+					fromServer.readInt(); // Ignored
+					
+					// The other player has joined
+					Platform.runLater(() -> 
+						taLog.appendText("Player 2 has joined. You go first"));
+						
+					// It is my turn
+					myTurn = true;
+				}
+				else if (player == PLAYER2) {
+					Platform.runLater(() -> {
+						lblTitle.setText("Player 2");
+						taLog.appendText("Waiting for Player 1 to go");
+					});
+				}
+				
+				// Continue to play
+				while (continueToPlay) {
+					if (player == PLAYER1) {
+						waitForPlayerAction(); // Wait for player 1 to move
+						sendMove(); // Send the move to the server
+						receiveInfoFromServer(); // Receive info from the server
+					}
+					else if (player == PLAYER2) {
+						receiveInfoFromServer(); // Receive info from the server
+						waitForPlayerAction(); // Wait for player 2 to move
+						sendMove(); // Send player 2's move to the server
+					}
+				}
+			}
+			catch (Exception ex) {
+				ex.printStackTrace();
+			}
+		}).start();
+	}
 	
-	// An inner class for a cell
-	public class Cell extends Pane {
+	/** Wait for the player to mark a cell */
+	private void waitForPlayerAction() throws InterruptedException {
+		while (waiting) {
+			Thread.sleep(100);
+		}
+		
+		waiting = true;
+	}
+	
+	/** Send this player's move to the server */
+	private void sendMove() throws IOException {
+		toServer.writeInt(rowSelected); // Send the selected row
+		toServer.writeInt(columnSelected); // Send the selected column
+	}
+	
+	/** Receive info from the server */
+	private void receiveInfoFromServer() throws IOException {
+		// Receive game status
+		int status = fromServer.readInt();
+		
+		if (status == PLAYER1_WON) {
+			// Stop playing
+			continueToPlay = false;
+			Platform.runLater(() -> taLog.appendText("Player 1 won! \n"));
+		}
+		else if (status == PLAYER2_WON) {
+			// Stop playing
+			continueToPlay = false;
+			Platform.runLater(() -> taLog.appendText("Player 2 won! \n"));
+		}
+		else {
+			receiveMove();
+			Platform.runLater(() -> taLog.appendText("My turn"));
+			myTurn = true; // It is my turn
+		}
+	}
+	
+	private void receiveMove() throws IOException {
+		// Get the other player's move
+		int row = fromServer.readInt();
+		int column = fromServer.readInt();
+		Platform.runLater(() -> playerGrid[row][column].repaint()); // ! TEST THIS !
+	}
+	
+	// An inner class for the player's cell
+	public class PlayerCell extends Pane {
 		// Indicate the row and column of this cell in the board
 		private int row;
 		private int column;
@@ -228,7 +321,7 @@ public class BattleshipOnlineClient extends Application
 		// Ship used for this cell
 		private Ship ship = null;
 		
-		public Cell(int row, int column) {
+		public PlayerCell(int row, int column) {
 			this.row = row;
 			this.column = column;
 			this.setOnMouseClicked(e -> handleMouseClick());
@@ -279,12 +372,88 @@ public class BattleshipOnlineClient extends Application
 		}
 		/* Handle a mouse click event */
 		private void handleMouseClick() {
-			// If cell is not occupied
-			if (ship == null) {
-				setShip(selectedShip);
+			// Player placing ships on grid
+			if (isReady == false) {
+				// If cell is not occupied
+				if (ship == null) {
+					setShip(selectedShip);
+				}
+			}
+			else {
+				// Enemy firing on grid
+				if (ship == null) {
+					this.getChildren().add(new Text("MISS!"));
+				}
+				else {
+					this.getChildren().add(new Text("SUNK!!!"));
+					shipsToBeSunk.remove(getShip());
+				}
 			}
 		}
 	}
+	
+	// An inner class for the enemy's cell
+	public class EnemyCell extends Pane {
+		// Indicate the row and column of this cell in the board
+		private int row;
+		private int column;
+				
+		// Ship used for this cell
+		private Ship ship = null;
+				
+		public EnemyCell(int row, int column) {
+			this.row = row;
+			this.column = column;
+			this.setOnMouseClicked(e -> handleMouseClick());
+		}
+		
+		// Return ship
+		public Ship getShip() {
+			return ship;
+		}
+		
+		protected void repaint() {
+			if (ship == null) {
+				this.getChildren().add(new Text("MISS!"));
+			}
+			else {
+				this.getChildren().add(new Text("SUNK!!!"));
+				shipsToBeSunk.remove(getShip());
+			}
+		}
+		/* Handle a mouse click event */
+		private void handleMouseClick() {
+			repaint();
+		}
+	}
+	
+	/* Handle 'ready' button pressed */
+	public void pageTransition(SplitPane playerSplitPane, GridPane enemyGridPane, 
+			StackPane stackPane, HBox box, Button button, Label title, boolean isReady) {
+		// Replace stackPane with enemyGridPane in playerSplitPane
+		playerSplitPane.getItems().remove(stackPane);
+		playerSplitPane.getItems().add(enemyGridPane);
+		
+		// Remove button from box
+		box.getChildren().remove(button);
+		
+		// Change page title
+		title.setText("Battle Phase");
+		
+		// Indicate that the player is ready
+		isReady = true;
+	}
+	
+	// Creates and returns a button that represents a ship
+		public RadioButton shipButton(HBox box, Ship ship) {
+			for (int i = 0; i < ship.getLength(); i++) {
+				box.getChildren().add(new Rectangle(30, 30));
+				box.setAlignment(Pos.CENTER);
+			}
+			RadioButton rbNew = new RadioButton(ship.getName());
+			box.getChildren().add(rbNew);
+			return rbNew;
+		}
 	
 	// Main method
 	public static void main(String[] args) {
