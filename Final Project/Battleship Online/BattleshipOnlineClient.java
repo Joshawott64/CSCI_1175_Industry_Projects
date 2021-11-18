@@ -22,6 +22,10 @@ public class BattleshipOnlineClient extends Application
 	private PlayerCell[][] playerGrid = new PlayerCell[10][10];
 	private EnemyCell[][] enemyGrid = new EnemyCell[10][10];
 	
+	// Create grid panes
+	GridPane playerGridPane;
+	GridPane enemyGridPane;
+	
 	// Create and initialize a title label
 	private Label lblTitle = new Label();
 	
@@ -46,11 +50,11 @@ public class BattleshipOnlineClient extends Application
 	private String host = "localhost";
 	
 	// Create and initialize ships
-	Ship carrier = new Ship(5, false, "Carrier");
-	Ship battleship = new Ship(4, false, "Battleship");
-	Ship destroyer = new Ship(3, false, "Destroyer");
-	Ship submarine = new Ship(3, false, "Submarine");
-	Ship patrolBoat = new Ship(2, false, "Patrol Boat");
+	Ship carrier = new Ship(5, false, "Carrier", new Rectangle(10, 10));
+	Ship battleship = new Ship(4, false, "Battleship", new Rectangle(10, 10));
+	Ship destroyer = new Ship(3, false, "Destroyer", new Rectangle(10, 10));
+	Ship submarine = new Ship(3, false, "Submarine", new Rectangle(10, 10));
+	Ship patrolBoat = new Ship(2, false, "Patrol Boat", new Rectangle(10, 10));
 	
 	// Create ArrayList to store ships for prep phase
 	ArrayList<Ship> shipsToBePlaced = new ArrayList<>();
@@ -74,10 +78,12 @@ public class BattleshipOnlineClient extends Application
 		/* Begin prep stage */
 		
 		// GridPanes to hold cells
-		GridPane playerGridPane = new GridPane();
+		playerGridPane = new GridPane();
+		playerGridPane.setAlignment(Pos.CENTER);
 		Label lblPlayerGrid = new Label("Your Grid", playerGridPane);
 		lblPlayerGrid.setContentDisplay(ContentDisplay.BOTTOM);
-		GridPane enemyGridPane = new GridPane(); // ! Temporary, final will read from server !
+		enemyGridPane = new GridPane(); // ! Temporary, final will read from server !
+		enemyGridPane.setAlignment(Pos.CENTER);
 		Label lblEnemyGrid = new Label("Enemy Grid", enemyGridPane);
 		lblEnemyGrid.setContentDisplay(ContentDisplay.BOTTOM);
 		for (int i = 0; i < 10; i++) {
@@ -217,7 +223,6 @@ public class BattleshipOnlineClient extends Application
 			ex.printStackTrace();
 		}
 		
-		// Control the game on a separate thread
 		new Thread(() -> {
 			try {
 				// Get notification from the server
@@ -234,9 +239,19 @@ public class BattleshipOnlineClient extends Application
 					// Receive startup notification from the server
 					fromServer.readInt(); // Ignored
 					
+					if (isReady == true) {
+						Platform.runLater(() -> {
+							taLog.appendText("Player 1 is ready \n");
+						});
+						sendPlayerShips(); // Send ship coordinates to server
+					}
+					
 					// The other player has joined
 					Platform.runLater(() -> 
 						taLog.appendText("Player 2 has joined. You go first"));
+					
+					waitForPlayerAction();
+					receiveEnemyShips(); // Receive enemy ships from server
 						
 					// It is my turn
 					myTurn = true;
@@ -246,6 +261,16 @@ public class BattleshipOnlineClient extends Application
 						lblTitle.setText("Player 2");
 						taLog.appendText("Waiting for Player 1 to go");
 					});
+					
+					if (isReady == true) {
+						Platform.runLater(() -> {
+							taLog.appendText("Player 2 is ready \n");
+						});
+						sendPlayerShips(); // Send ship coordinates to server
+					}
+					
+					waitForPlayerAction();
+					receiveEnemyShips(); // Receive enemy ships from server
 				}
 				
 				// Continue to play
@@ -281,6 +306,7 @@ public class BattleshipOnlineClient extends Application
 	private void sendMove() throws IOException {
 		toServer.writeInt(rowSelected); // Send the selected row
 		toServer.writeInt(columnSelected); // Send the selected column
+		Platform.runLater(() -> enemyGrid[rowSelected][columnSelected].repaint());
 	}
 	
 	/** Receive info from the server */
@@ -312,6 +338,51 @@ public class BattleshipOnlineClient extends Application
 		Platform.runLater(() -> playerGrid[row][column].repaint()); // ! TEST THIS !
 	}
 	
+	private void sendPlayerShips() throws IOException {
+		toServer.writeInt(GridPane.getColumnIndex(carrier.getRectangle()));
+		toServer.writeInt(GridPane.getRowIndex(carrier.getRectangle()));
+		toServer.writeInt(GridPane.getColumnIndex(battleship.getRectangle()));
+		toServer.writeInt(GridPane.getRowIndex(battleship.getRectangle()));
+		toServer.writeInt(GridPane.getColumnIndex(destroyer.getRectangle()));
+		toServer.writeInt(GridPane.getRowIndex(destroyer.getRectangle()));
+		toServer.writeInt(GridPane.getColumnIndex(submarine.getRectangle()));
+		toServer.writeInt(GridPane.getRowIndex(submarine.getRectangle()));
+		toServer.writeInt(GridPane.getColumnIndex(patrolBoat.getRectangle()));
+		toServer.writeInt(GridPane.getRowIndex(patrolBoat.getRectangle()));
+	}
+	
+	private void receiveEnemyShips() throws IOException {
+		// Add carrier to enemyGridPane
+		int carrierColumn = fromServer.readInt();
+		int carrierRow = fromServer.readInt();
+		Rectangle enemyCarrier = shipsToBeSunk.get(0).getRectangle();
+		enemyGridPane.add(enemyCarrier, carrierColumn, carrierRow);
+		
+		// Add battleship to enemyGridPane
+		int battleshipColumn = fromServer.readInt();
+		int battleshipRow = fromServer.readInt();
+		Rectangle enemyBattleship = shipsToBeSunk.get(1).getRectangle();
+		enemyGridPane.add(enemyBattleship, battleshipColumn, battleshipRow);
+		
+		// Add destroyer to enemyGridPane
+		int destroyerColumn = fromServer.readInt();
+		int destroyerRow = fromServer.readInt();
+		Rectangle enemyDestroyer = shipsToBeSunk.get(2).getRectangle();
+		enemyGridPane.add(enemyDestroyer, destroyerColumn, destroyerRow);
+		
+		// Add submarine to enemyGridPane
+		int submarineColumn = fromServer.readInt();
+		int submarineRow = fromServer.readInt();
+		Rectangle enemySubmarine = shipsToBeSunk.get(3).getRectangle();
+		enemyGridPane.add(enemySubmarine, submarineColumn, submarineRow);
+		
+		// Add patrolBoat to enemyGridPane
+		int patrolBoatColumn = fromServer.readInt();
+		int patrolBoatRow = fromServer.readInt();
+		Rectangle enemyPatrolBoat = shipsToBeSunk.get(4).getRectangle();
+		enemyGridPane.add(enemyPatrolBoat, patrolBoatColumn, patrolBoatRow);
+	}
+	
 	// An inner class for the player's cell
 	public class PlayerCell extends Pane {
 		// Indicate the row and column of this cell in the board
@@ -340,31 +411,34 @@ public class BattleshipOnlineClient extends Application
 		
 		protected void repaint() {
 			if (ship == carrier) {
-				this.getChildren().add(new Text("Carrier"));
+				Rectangle carrierRectangle = carrier.getRectangle();
+				this.getChildren().add(carrierRectangle);
+				GridPane.setHalignment(carrierRectangle, HPos.CENTER);
+				GridPane.setValignment(carrierRectangle, VPos.CENTER);
 				shipBox.getChildren().remove(rbCarrier);
 				shipsToBePlaced.remove(carrier);
 				selectedShip = null;
 			}
 			else if (ship == battleship) {
-				this.getChildren().add(new Text("Battleship"));
+				this.getChildren().add(battleship.getRectangle());
 				shipBox.getChildren().remove(rbBattleship);
 				shipsToBePlaced.remove(battleship);
 				selectedShip = null;
 			}
 			else if (ship == destroyer) {
-				this.getChildren().add(new Text("Destroyer"));
+				this.getChildren().add(destroyer.getRectangle());
 				shipBox.getChildren().remove(rbDestroyer);
 				shipsToBePlaced.remove(destroyer);
 				selectedShip = null;
 			}
 			else if (ship == submarine) {
-				this.getChildren().add(new Text("Submarine"));
+				this.getChildren().add(submarine.getRectangle());
 				shipBox.getChildren().remove(rbSubmarine);
 				shipsToBePlaced.remove(submarine);
 				selectedShip = null;
 			}
 			else if (ship == patrolBoat) {
-				this.getChildren().add(new Text("Patrol Boat"));
+				this.getChildren().add(patrolBoat.getRectangle());
 				shipBox.getChildren().remove(rbPatrol);
 				shipsToBePlaced.remove(patrolBoat);
 				selectedShip = null;
@@ -423,7 +497,15 @@ public class BattleshipOnlineClient extends Application
 		}
 		/* Handle a mouse click event */
 		private void handleMouseClick() {
-			repaint();
+			ContextMenu contextMenu = new ContextMenu();
+			MenuItem menuItemFire = new MenuItem("Fire");
+			MenuItem menuItemCancel = new MenuItem("Cancel");
+			contextMenu.getItems().add(menuItemFire);
+			contextMenu.getItems().add(menuItemCancel);
+			contextMenu.show(this, 100, 400);
+			
+			menuItemFire.setOnAction(e -> repaint());
+			menuItemCancel.setOnAction(e -> contextMenu.hide());
 		}
 	}
 	
