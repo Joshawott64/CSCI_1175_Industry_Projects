@@ -1,19 +1,22 @@
+import javafx.scene.shape.Rectangle;
 
 public class Ship {
 	// Data fields
 	int length;
 	boolean isSunk;
 	String name;
+	Rectangle rectangle;
 	
 	// Construct default ship
 	public Ship() {
 	}
 	
 	// Construct ship with specified length, isSunk, and name
-	public Ship(int length, boolean isSunk, String name) {
+	public Ship(int length, boolean isSunk, String name, Rectangle rectangle) {
 		this.length = length;
 		this.isSunk = isSunk;
 		this.name = name;
+		this.rectangle = rectangle;
 	}
 	
 	// Return length
@@ -44,5 +47,15 @@ public class Ship {
 	// Set a new name
 	public void setName(String newName) {
 		name = newName;
+	}
+	
+	// Return rectangle
+	public Rectangle getRectangle() {
+		return rectangle;
+	}
+	
+	// Set a new rectangle
+	public void setRectangle(Rectangle newRectangle) {
+		rectangle = newRectangle;
 	}
 }
