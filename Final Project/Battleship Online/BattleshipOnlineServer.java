@@ -83,6 +83,10 @@ public class BattleshipOnlineServer extends Application
 		private String[][] player1Grid = new String[10][10];
 		private String[][] player2Grid = new String[10][10];
 		
+		// Create and initialize arrays
+		private String[] player1RemainingShips = new String[5];
+		private String[] player2RemainingShips = new String[5];
+		
 		private DataInputStream fromPlayer1;
 		private DataOutputStream toPlayer1;
 		private DataInputStream fromPlayer2;
@@ -97,6 +101,25 @@ public class BattleshipOnlineServer extends Application
 			this.player2 = player2;
 			
 			// Initialize cells
+			for (int i = 0; i < 10; i++) {
+				for (int j = 0; j < 10; j++) {
+					player1Grid[i][j] = "Empty";
+					player2Grid[i][j] = "Empty";
+				}
+			}
+			
+			// Initialize arrays
+			player1RemainingShips[0] = "Carrier";
+			player1RemainingShips[1] = "BattleShip";
+			player1RemainingShips[2] = "Destroyer";
+			player1RemainingShips[3] = "Submarine";
+			player1RemainingShips[4] = "Patrol Boat";
+			
+			player2RemainingShips[0] = "Carrier";
+			player2RemainingShips[1] = "BattleShip";
+			player2RemainingShips[2] = "Destroyer";
+			player2RemainingShips[3] = "Submarine";
+			player2RemainingShips[4] = "Patrol Boat";
 		}
 		
 		/** Implement the run() method for the thread */
@@ -115,7 +138,45 @@ public class BattleshipOnlineServer extends Application
 				// Write anything to notify player 1 to start
 				toPlayer1.writeInt(1);
 				
+				// Read players' ship coordinates and update grids
+				int p1CarrierColumn = fromPlayer1.readInt();
+				int p1CarrierRow = fromPlayer1.readInt();
+				player1Grid[p1CarrierColumn][p1CarrierRow] = "Carrier";
+				int p1BattleshipColumn = fromPlayer1.readInt();
+				int p1BattleshipRow = fromPlayer1.readInt();
+				player1Grid[p1BattleshipColumn][p1BattleshipRow] = "Battleship";
+				int p1DestroyerColumn = fromPlayer1.readInt();
+				int p1DestroyerRow = fromPlayer1.readInt();
+				player1Grid[p1DestroyerColumn][p1DestroyerRow] = "Destroyer";
+				int p1SubmarineColumn = fromPlayer1.readInt();
+				int p1SubmarineRow = fromPlayer1.readInt();
+				player1Grid[p1SubmarineColumn][p1SubmarineRow] = "Submarine";
+				int p1PatrolColumn = fromPlayer1.readInt();
+				int p1PatrolRow = fromPlayer1.readInt();
+				player1Grid[p1PatrolColumn][p1PatrolRow] = "Patrol Boat";
+				
+				int p2CarrierColumn = fromPlayer2.readInt();
+				int p2CarrierRow = fromPlayer2.readInt();
+				player2Grid[p2CarrierColumn][p2CarrierRow] = "Carrier";
+				int p2BattleshipColumn = fromPlayer2.readInt();
+				int p2BattleshipRow = fromPlayer2.readInt();
+				player2Grid[p2BattleshipColumn][p2BattleshipRow] = "Battleship";
+				int p2DestroyerColumn = fromPlayer2.readInt();
+				int p2DestroyerRow = fromPlayer2.readInt();
+				player2Grid[p2DestroyerColumn][p2DestroyerRow] = "Destroyer";
+				int p2SubmarineColumn = fromPlayer2.readInt();
+				int p2SubmarineRow = fromPlayer2.readInt();
+				player2Grid[p2SubmarineColumn][p2SubmarineRow] = "Submarine";
+				int p2PatrolColumn = fromPlayer2.readInt();
+				int p2PatrolRow = fromPlayer2.readInt();
+				player2Grid[p2PatrolColumn][p2PatrolRow] = "Patrol Boat";
+						
 				// Continuously serve the players and report game status
+				while (true) {
+					// Receive a move from player 1
+					int row = fromPlayer1.readInt();
+					int column = fromPlayer1.readInt();
+				}
 				
 			}
 			catch(IOException ex) {
@@ -139,7 +200,7 @@ public class BattleshipOnlineServer extends Application
 
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-
+		launch(args);
 	}
 
 }
