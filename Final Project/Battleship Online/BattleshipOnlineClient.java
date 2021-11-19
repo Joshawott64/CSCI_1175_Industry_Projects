@@ -205,7 +205,7 @@ public class BattleshipOnlineClient extends Application
 		primaryStage.show();
 		
 		// Connect to the server
-		//connectToServer();
+		connectToServer();
 	}
 	
 	private void connectToServer() {
