@@ -16,7 +16,8 @@ public class BattleshipOnlineClient extends Application
 	private boolean myTurn = false;
 	
 	// Indicate whether the player is ready
-	private boolean isReady = false;
+	private boolean playerIsReady = false;
+	private boolean enemyIsReady = false;
 	
 	// Create and initialize cells
 	private PlayerCell[][] playerGrid = new PlayerCell[10][10];
@@ -30,7 +31,7 @@ public class BattleshipOnlineClient extends Application
 	private Label lblTitle = new Label();
 	
 	// Create and initialize a log text area
-	private TextArea taLog = new TextArea();
+	private TextArea taLog;
 	
 	// Indicate selected row and column by the current move
 	private int rowSelected;
@@ -164,7 +165,7 @@ public class BattleshipOnlineClient extends Application
 		bottomBox.setAlignment(Pos.TOP_CENTER);
 		
 		// Create ScrollPane & TextArea
-		TextArea taLog = new TextArea();
+		taLog = new TextArea();
 		taLog.setEditable(false);
 		taLog.setPrefColumnCount(20);
 		taLog.setPrefRowCount(5);
@@ -187,11 +188,13 @@ public class BattleshipOnlineClient extends Application
 		
 		btReady.setOnAction(e -> {
 			if (shipsToBePlaced.isEmpty()) {
-				pageTransition(playerSplitPane, enemyGridPane, stackPane, 
-						bottomBox, btReady, lblTitle, isReady);
+				playerIsReady = pageTransition(playerSplitPane, enemyGridPane, stackPane, 
+						bottomBox, btReady, lblTitle, playerIsReady);
 			}
 			else {
-				taLog.appendText("Place down all ships before readying up \n");
+				Platform.runLater(() -> 
+					taLog.appendText("Place down all ships before readying up \n"));
+				
 			}
 		});
 		btQuit.setOnAction(e -> continueToPlay = false);
@@ -236,23 +239,36 @@ public class BattleshipOnlineClient extends Application
 						taLog.appendText("Waiting for player 2 to join \n");
 					});
 					
+					// Sleep until player is ready
+					while (playerIsReady != true) {
+						Thread.sleep(100);
+					}
+					toServer.writeBoolean(playerIsReady); // Write to server when player is ready
+					Platform.runLater(() -> taLog.appendText("Player 1 is ready"));
+					
+					enemyIsReady = fromServer.readBoolean();
+					// Sleep until enemy is ready
+					while (enemyIsReady == false) {
+						Thread.sleep(100);
+						enemyIsReady = fromServer.readBoolean(); // Read enemyIsReady until true
+					}
+					Platform.runLater(() -> taLog.appendText("Player 2 is ready"));
+					
 					// Receive startup notification from the server
 					fromServer.readInt(); // Ignored
-					
-					if (isReady == true) {
-						Platform.runLater(() -> {
-							taLog.appendText("Player 1 is ready \n");
-						});
-						sendPlayerShips(); // Send ship coordinates to server
-					}
 					
 					// The other player has joined
 					Platform.runLater(() -> 
 						taLog.appendText("Player 2 has joined. You go first"));
 					
-					waitForPlayerAction();
-					receiveEnemyShips(); // Receive enemy ships from server
-						
+					if (playerIsReady == true && enemyIsReady == true) {
+						Platform.runLater(() -> {
+							taLog.appendText("Both players are ready, sending coordinates");
+						});
+						sendPlayerShips(); // Send ship coordinates to server
+						receiveEnemyShips(); // Receive enemy ships from server
+					}
+					
 					// It is my turn
 					myTurn = true;
 				}
@@ -262,28 +278,42 @@ public class BattleshipOnlineClient extends Application
 						taLog.appendText("Waiting for Player 1 to go");
 					});
 					
-					if (isReady == true) {
+					// Sleep until player is ready
+					while (playerIsReady != true) {
+						Thread.sleep(100);
+					}
+					toServer.writeBoolean(playerIsReady); // Write to server when player is ready
+					Platform.runLater(() -> taLog.appendText("Player 2 is ready"));
+					
+					enemyIsReady = fromServer.readBoolean();
+					// Sleep until enemy is ready
+					while (enemyIsReady == false) {
+						Thread.sleep(100);
+						enemyIsReady = fromServer.readBoolean(); // Read enemyIsReady until true
+					}
+					Platform.runLater(() -> taLog.appendText("Player 1 is ready"));
+					
+					if (playerIsReady == true && enemyIsReady == true) {
+						toServer.writeBoolean(playerIsReady);
 						Platform.runLater(() -> {
 							taLog.appendText("Player 2 is ready \n");
 						});
 						sendPlayerShips(); // Send ship coordinates to server
+						receiveEnemyShips(); // Receive enemy ships from server
 					}
-					
-					waitForPlayerAction();
-					receiveEnemyShips(); // Receive enemy ships from server
 				}
 				
 				// Continue to play
 				while (continueToPlay) {
 					if (player == PLAYER1) {
 						waitForPlayerAction(); // Wait for player 1 to move
-						sendMove(); // Send the move to the server
+						enemyGrid[rowSelected][columnSelected].handleMouseClick();
 						receiveInfoFromServer(); // Receive info from the server
 					}
 					else if (player == PLAYER2) {
 						receiveInfoFromServer(); // Receive info from the server
 						waitForPlayerAction(); // Wait for player 2 to move
-						sendMove(); // Send player 2's move to the server
+						enemyGrid[rowSelected][columnSelected].handleMouseClick();
 					}
 				}
 			}
@@ -339,48 +369,48 @@ public class BattleshipOnlineClient extends Application
 	}
 	
 	private void sendPlayerShips() throws IOException {
-		toServer.writeInt(GridPane.getColumnIndex(carrier.getRectangle()));
 		toServer.writeInt(GridPane.getRowIndex(carrier.getRectangle()));
-		toServer.writeInt(GridPane.getColumnIndex(battleship.getRectangle()));
+		toServer.writeInt(GridPane.getColumnIndex(carrier.getRectangle()));
 		toServer.writeInt(GridPane.getRowIndex(battleship.getRectangle()));
-		toServer.writeInt(GridPane.getColumnIndex(destroyer.getRectangle()));
+		toServer.writeInt(GridPane.getColumnIndex(battleship.getRectangle()));
 		toServer.writeInt(GridPane.getRowIndex(destroyer.getRectangle()));
-		toServer.writeInt(GridPane.getColumnIndex(submarine.getRectangle()));
+		toServer.writeInt(GridPane.getColumnIndex(destroyer.getRectangle()));
 		toServer.writeInt(GridPane.getRowIndex(submarine.getRectangle()));
-		toServer.writeInt(GridPane.getColumnIndex(patrolBoat.getRectangle()));
+		toServer.writeInt(GridPane.getColumnIndex(submarine.getRectangle()));
 		toServer.writeInt(GridPane.getRowIndex(patrolBoat.getRectangle()));
+		toServer.writeInt(GridPane.getColumnIndex(patrolBoat.getRectangle()));
 	}
 	
 	private void receiveEnemyShips() throws IOException {
 		// Add carrier to enemyGridPane
-		int carrierColumn = fromServer.readInt();
 		int carrierRow = fromServer.readInt();
+		int carrierColumn = fromServer.readInt();
 		Rectangle enemyCarrier = shipsToBeSunk.get(0).getRectangle();
-		enemyGridPane.add(enemyCarrier, carrierColumn, carrierRow);
+		enemyGridPane.add(enemyCarrier, carrierRow, carrierColumn);
 		
 		// Add battleship to enemyGridPane
-		int battleshipColumn = fromServer.readInt();
 		int battleshipRow = fromServer.readInt();
+		int battleshipColumn = fromServer.readInt();
 		Rectangle enemyBattleship = shipsToBeSunk.get(1).getRectangle();
-		enemyGridPane.add(enemyBattleship, battleshipColumn, battleshipRow);
+		enemyGridPane.add(enemyBattleship, battleshipRow, battleshipColumn);
 		
 		// Add destroyer to enemyGridPane
-		int destroyerColumn = fromServer.readInt();
 		int destroyerRow = fromServer.readInt();
+		int destroyerColumn = fromServer.readInt();
 		Rectangle enemyDestroyer = shipsToBeSunk.get(2).getRectangle();
-		enemyGridPane.add(enemyDestroyer, destroyerColumn, destroyerRow);
+		enemyGridPane.add(enemyDestroyer, destroyerRow, destroyerColumn);
 		
 		// Add submarine to enemyGridPane
-		int submarineColumn = fromServer.readInt();
 		int submarineRow = fromServer.readInt();
+		int submarineColumn = fromServer.readInt();
 		Rectangle enemySubmarine = shipsToBeSunk.get(3).getRectangle();
-		enemyGridPane.add(enemySubmarine, submarineColumn, submarineRow);
+		enemyGridPane.add(enemySubmarine, submarineRow, submarineColumn);
 		
 		// Add patrolBoat to enemyGridPane
-		int patrolBoatColumn = fromServer.readInt();
 		int patrolBoatRow = fromServer.readInt();
+		int patrolBoatColumn = fromServer.readInt();
 		Rectangle enemyPatrolBoat = shipsToBeSunk.get(4).getRectangle();
-		enemyGridPane.add(enemyPatrolBoat, patrolBoatColumn, patrolBoatRow);
+		enemyGridPane.add(enemyPatrolBoat, patrolBoatRow, patrolBoatColumn);
 	}
 	
 	// An inner class for the player's cell
@@ -447,7 +477,7 @@ public class BattleshipOnlineClient extends Application
 		/* Handle a mouse click event */
 		private void handleMouseClick() {
 			// Player placing ships on grid
-			if (isReady == false) {
+			if (playerIsReady == false) {
 				// If cell is not occupied
 				if (ship == null) {
 					setShip(selectedShip);
@@ -504,13 +534,21 @@ public class BattleshipOnlineClient extends Application
 			contextMenu.getItems().add(menuItemCancel);
 			contextMenu.show(this, 100, 400);
 			
-			menuItemFire.setOnAction(e -> repaint());
+			menuItemFire.setOnAction(e -> {
+				try {
+					sendMove();
+					repaint();
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+			});
 			menuItemCancel.setOnAction(e -> contextMenu.hide());
 		}
 	}
 	
 	/* Handle 'ready' button pressed */
-	public void pageTransition(SplitPane playerSplitPane, GridPane enemyGridPane, 
+	public boolean pageTransition(SplitPane playerSplitPane, GridPane enemyGridPane, 
 			StackPane stackPane, HBox box, Button button, Label title, boolean isReady) {
 		// Replace stackPane with enemyGridPane in playerSplitPane
 		playerSplitPane.getItems().remove(stackPane);
@@ -523,7 +561,7 @@ public class BattleshipOnlineClient extends Application
 		title.setText("Battle Phase");
 		
 		// Indicate that the player is ready
-		isReady = true;
+		return isReady = true;
 	}
 	
 	// Creates and returns a button that represents a ship
