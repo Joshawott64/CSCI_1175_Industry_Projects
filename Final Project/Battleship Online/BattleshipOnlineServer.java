@@ -83,9 +83,9 @@ public class BattleshipOnlineServer extends Application
 		private String[][] player1Grid = new String[10][10];
 		private String[][] player2Grid = new String[10][10];
 		
-		// Create and initialize arrays
-		private String[] player1RemainingShips = new String[5];
-		private String[] player2RemainingShips = new String[5];
+		// Create and initialize array lists
+		private ArrayList<String> player1RemainingShips = new ArrayList<String>();
+		private ArrayList<String> player2RemainingShips = new ArrayList<String>();
 		
 		private DataInputStream fromPlayer1;
 		private DataOutputStream toPlayer1;
@@ -108,18 +108,20 @@ public class BattleshipOnlineServer extends Application
 				}
 			}
 			
-			// Initialize arrays
-			player1RemainingShips[0] = "Carrier";
-			player1RemainingShips[1] = "BattleShip";
-			player1RemainingShips[2] = "Destroyer";
-			player1RemainingShips[3] = "Submarine";
-			player1RemainingShips[4] = "Patrol Boat";
+			// Initialize arraylists
+			ArrayList<String> player1RemainingShips = new ArrayList<String>();
+			player1RemainingShips.add("Carrier");
+			player1RemainingShips.add("Battleship");
+			player1RemainingShips.add("Destroyer");
+			player1RemainingShips.add("Submarine");
+			player1RemainingShips.add("Patrol Boat");
 			
-			player2RemainingShips[0] = "Carrier";
-			player2RemainingShips[1] = "BattleShip";
-			player2RemainingShips[2] = "Destroyer";
-			player2RemainingShips[3] = "Submarine";
-			player2RemainingShips[4] = "Patrol Boat";
+			ArrayList<String> player2RemainingShips = new ArrayList<String>();
+			player2RemainingShips.add("Carrier");
+			player2RemainingShips.add("Battleship");
+			player2RemainingShips.add("Destroyer");
+			player2RemainingShips.add("Submarine");
+			player2RemainingShips.add("Patrol Boat");
 		}
 		
 		/** Implement the run() method for the thread */
@@ -176,8 +178,77 @@ public class BattleshipOnlineServer extends Application
 					// Receive a move from player 1
 					int row = fromPlayer1.readInt();
 					int column = fromPlayer1.readInt();
-				}
-				
+					switch (player2Grid[row][column]) {
+						case "Carrier":	player2RemainingShips.remove("Carrier");
+										player2Grid[row][column] = "Sunk";
+										break;
+						case "Battleship":	player2RemainingShips.remove("Battleship");
+											player2Grid[row][column] = "Sunk";
+											break;
+						case "Destroyer":	player2RemainingShips.remove("Destroyer");
+											player2Grid[row][column] = "Sunk";
+											break;
+						case "Submarine":	player2RemainingShips.remove("Submarine");
+											player2Grid[row][column] = "Sunk";
+											break;
+						case "Patrol Boat":	player2RemainingShips.remove("Patrol Boat");
+											player2Grid[row][column] = "Sunk";
+											break;
+						case "Empty":	player2Grid[row][column] = "Miss";
+						
+						// Check if Player 1 wins
+						if (player2RemainingShips.isEmpty()) {
+							toPlayer1.writeInt(PLAYER1_WON);
+							toPlayer2.writeInt(PLAYER1_WON);
+							sendMove(toPlayer2, row, column);
+							break;
+						}
+						else {
+							// Notify player 2 to take the turn
+							toPlayer2.writeInt(CONTINUE);
+							
+							// Send player 1's selected row and column to player 2
+							sendMove(toPlayer2, row, column);
+						}
+					}
+					
+					// Receive a move from player 2
+					row = fromPlayer2.readInt();
+					column = fromPlayer2.readInt();
+					switch (player1Grid[row][column]) {
+						case "Carrier":	player1RemainingShips.remove("Carrier");
+										player1Grid[row][column] = "Sunk";
+										break;
+						case "Battleship":	player1RemainingShips.remove("Battleship");
+											player1Grid[row][column] = "Sunk";
+											break;
+						case "Destroyer":	player1RemainingShips.remove("Destroyer");
+											player1Grid[row][column] = "Sunk";
+											break;
+						case "Submarine":	player1RemainingShips.remove("Submarine");
+											player1Grid[row][column] = "Sunk";
+											break;
+						case "Patrol Boat":	player1RemainingShips.remove("Patrol Boat");
+											player1Grid[row][column] = "Sunk";
+											break;
+						case "Empty":	player1Grid[row][column] = "Miss";
+						
+						// Check if Player 2 wins
+						if (player1RemainingShips.isEmpty()) {
+							toPlayer1.writeInt(PLAYER1_WON);
+							toPlayer2.writeInt(PLAYER1_WON);
+							sendMove(toPlayer1, row, column);
+							break;
+						}
+						else {
+							// Notify player 1 to take the turn
+							toPlayer1.writeInt(CONTINUE);
+							
+							// Send player 2's selected row and column to player 1
+							sendMove(toPlayer1, row, column);
+						}
+					}
+				}	
 			}
 			catch(IOException ex) {
 				ex.printStackTrace();
