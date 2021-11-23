@@ -6,6 +6,7 @@ import javafx.geometry.*;
 import javafx.scene.*;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.paint.*;
 import javafx.scene.shape.*;
 import javafx.scene.text.*;
 import javafx.stage.*;
@@ -50,12 +51,19 @@ public class BattleshipOnlineClient extends Application
 	// Host name or ip
 	private String host = "localhost";
 	
-	// Create and initialize ships
+	// Create and initialize player ships
 	Ship carrier = new Ship(5, false, "Carrier", new Rectangle(10, 10));
 	Ship battleship = new Ship(4, false, "Battleship", new Rectangle(10, 10));
 	Ship destroyer = new Ship(3, false, "Destroyer", new Rectangle(10, 10));
 	Ship submarine = new Ship(3, false, "Submarine", new Rectangle(10, 10));
 	Ship patrolBoat = new Ship(2, false, "Patrol Boat", new Rectangle(10, 10));
+	
+	// Create and initialize enemy ships
+	Ship enemyCarrier = new Ship(5, false, "Carrier", new Rectangle(10, 10));
+	Ship enemyBattleship = new Ship(4, false, "Battleship", new Rectangle(10, 10));
+	Ship enemyDestroyer = new Ship(3, false, "Destroyer", new Rectangle(10, 10));
+	Ship enemySubmarine = new Ship(3, false, "Submarine", new Rectangle(10, 10));
+	Ship enemyPatrolBoat = new Ship(2, false, "Patrol Boat", new Rectangle(10, 10));
 	
 	// Create rectangles
 	Rectangle carrierRectangle;
@@ -63,6 +71,12 @@ public class BattleshipOnlineClient extends Application
 	Rectangle destroyerRectangle;
 	Rectangle submarineRectangle;
 	Rectangle patrolRectangle;
+	
+	Rectangle enemyCarrierRectangle;
+	Rectangle enemyBattleshipRectangle;
+	Rectangle enemyDestroyerRectangle;
+	Rectangle enemySubmarineRectangle;
+	Rectangle enemyPatrolRectangle;
 	
 	// Create ArrayList to store ships for prep phase
 	ArrayList<Ship> shipsToBePlaced = new ArrayList<>();
@@ -83,8 +97,6 @@ public class BattleshipOnlineClient extends Application
 	
 	@Override // Override the start method in the Application class
 	public void start(Stage primaryStage) {
-		/* Begin prep stage */
-		
 		// GridPanes to hold cells
 		playerGridPane = new GridPane();
 		playerGridPane.setAlignment(Pos.CENTER);
@@ -115,19 +127,19 @@ public class BattleshipOnlineClient extends Application
 			playerGridPane.getRowConstraints().add(rowConst);
 			enemyGridPane.getRowConstraints().add(rowConst);
 		}
-		
+				
 		// Add ships to ArrayLists
-		shipsToBePlaced.add(carrier);
-		shipsToBePlaced.add(battleship);
-		shipsToBePlaced.add(destroyer);
-		shipsToBePlaced.add(submarine);
-		shipsToBePlaced.add(patrolBoat);
+		shipsToBePlaced.add(0, carrier);
+		shipsToBePlaced.add(1, battleship);
+		shipsToBePlaced.add(2, destroyer);
+		shipsToBePlaced.add(3, submarine);
+		shipsToBePlaced.add(4, patrolBoat);
 		
-		shipsToBeSunk.add(carrier);
-		shipsToBeSunk.add(battleship);
-		shipsToBeSunk.add(destroyer);
-		shipsToBeSunk.add(submarine);
-		shipsToBeSunk.add(patrolBoat);
+		shipsToBeSunk.add(0, enemyCarrier);
+		shipsToBeSunk.add(1, enemyBattleship);
+		shipsToBeSunk.add(2, enemyDestroyer);
+		shipsToBeSunk.add(3, enemySubmarine);
+		shipsToBeSunk.add(4, enemyPatrolBoat);
 				
 		// Add ships to splitpane
 		StackPane stackPane = new StackPane();
@@ -200,12 +212,9 @@ public class BattleshipOnlineClient extends Application
 			else {
 				Platform.runLater(() -> 
 					taLog.appendText("Place down all ships before readying up \n"));
-				
 			}
 		});
 		btQuit.setOnAction(e -> continueToPlay = false);
-		
-		/* End prep stage */
 		
 		// Create a scene and place it in the stage
 		Scene scene = new Scene(page, 1280, 720);
@@ -274,6 +283,7 @@ public class BattleshipOnlineClient extends Application
 					
 					// It is my turn
 					myTurn = true;
+					
 				}
 				else if (player == PLAYER2) {
 					Platform.runLater(() -> {
@@ -309,13 +319,13 @@ public class BattleshipOnlineClient extends Application
 				while (continueToPlay) {
 					if (player == PLAYER1) {
 						waitForPlayerAction(); // Wait for player 1 to move
-						enemyGrid[rowSelected][columnSelected].handleMouseClick();
+						sendMove();
 						receiveInfoFromServer(); // Receive info from the server
 					}
 					else if (player == PLAYER2) {
 						receiveInfoFromServer(); // Receive info from the server
 						waitForPlayerAction(); // Wait for player 2 to move
-						enemyGrid[rowSelected][columnSelected].handleMouseClick();
+						sendMove();
 					}
 				}
 			}
@@ -338,7 +348,6 @@ public class BattleshipOnlineClient extends Application
 	private void sendMove() throws IOException {
 		toServer.writeInt(rowSelected); // Send the selected row
 		toServer.writeInt(columnSelected); // Send the selected column
-		Platform.runLater(() -> enemyGrid[rowSelected][columnSelected].repaint());
 	}
 	
 	/** Receive info from the server */
@@ -364,6 +373,7 @@ public class BattleshipOnlineClient extends Application
 	}
 	
 	private void receiveMove() throws IOException {
+		System.out.println("receiveMove() has been called");
 		// Get the other player's move
 		int row = fromServer.readInt();
 		int column = fromServer.readInt();
@@ -387,41 +397,46 @@ public class BattleshipOnlineClient extends Application
 		// Add carrier to enemyGridPane
 		int carrierRow = fromServer.readInt();
 		int carrierColumn = fromServer.readInt();
-		Rectangle enemyCarrier = shipsToBeSunk.get(0).getRectangle();
+		enemyCarrierRectangle = enemyCarrier.getRectangle();
+		enemyCarrierRectangle.setFill(Color.WHITE);
 		Platform.runLater(() -> {
-			enemyGridPane.add(enemyCarrier, carrierColumn, carrierRow);
+			enemyGrid[carrierRow][carrierColumn].paintEnemyShips(enemyCarrierRectangle);
 		});
 		
 		// Add battleship to enemyGridPane
 		int battleshipRow = fromServer.readInt();
 		int battleshipColumn = fromServer.readInt();
-		Rectangle enemyBattleship = shipsToBeSunk.get(1).getRectangle();
+		enemyBattleshipRectangle = enemyBattleship.getRectangle();
+		enemyBattleshipRectangle.setFill(Color.WHITE);
 		Platform.runLater(() -> {
-			enemyGridPane.add(enemyBattleship, battleshipColumn, battleshipRow);
+			enemyGrid[battleshipRow][battleshipColumn].paintEnemyShips(enemyBattleshipRectangle);
 		});
 		
 		// Add destroyer to enemyGridPane
 		int destroyerRow = fromServer.readInt();
 		int destroyerColumn = fromServer.readInt();
-		Rectangle enemyDestroyer = shipsToBeSunk.get(2).getRectangle();
+		enemyDestroyerRectangle = enemyDestroyer.getRectangle();
+		enemyDestroyerRectangle.setFill(Color.WHITE);
 		Platform.runLater(() -> {
-			enemyGridPane.add(enemyDestroyer, destroyerColumn, destroyerRow);
+			enemyGrid[destroyerRow][destroyerColumn].paintEnemyShips(enemyDestroyerRectangle);
 		});
 		
 		// Add submarine to enemyGridPane
 		int submarineRow = fromServer.readInt();
 		int submarineColumn = fromServer.readInt();
-		Rectangle enemySubmarine = shipsToBeSunk.get(3).getRectangle();
+		enemySubmarineRectangle = enemySubmarine.getRectangle();
+		enemySubmarineRectangle.setFill(Color.WHITE);
 		Platform.runLater(() -> {
-			enemyGridPane.add(enemySubmarine, submarineColumn, submarineRow);
+			enemyGrid[submarineRow][submarineColumn].paintEnemyShips(enemySubmarineRectangle);
 		});
 		
 		// Add patrolBoat to enemyGridPane
 		int patrolBoatRow = fromServer.readInt();
 		int patrolBoatColumn = fromServer.readInt();
-		Rectangle enemyPatrolBoat = shipsToBeSunk.get(4).getRectangle();
+		enemyPatrolRectangle = enemyPatrolBoat.getRectangle();
+		enemyPatrolRectangle.setFill(Color.WHITE);
 		Platform.runLater(() -> {
-			enemyGridPane.add(enemyPatrolBoat, patrolBoatColumn, patrolBoatRow);
+			enemyGrid[patrolBoatRow][patrolBoatColumn].paintEnemyShips(enemyPatrolRectangle);
 		});
 	}
 	
@@ -455,8 +470,6 @@ public class BattleshipOnlineClient extends Application
 			if (ship == carrier) {
 				carrierRectangle = carrier.getRectangle();
 				this.getChildren().add(carrierRectangle);
-				GridPane.setHalignment(carrierRectangle, HPos.CENTER);
-				GridPane.setValignment(carrierRectangle, VPos.CENTER);
 				GridPane.setRowIndex(carrierRectangle, row);
 				GridPane.setColumnIndex(carrierRectangle, column);
 				shipBox.getChildren().remove(rbCarrier);
@@ -466,8 +479,6 @@ public class BattleshipOnlineClient extends Application
 			else if (ship == battleship) {
 				battleshipRectangle = battleship.getRectangle();
 				this.getChildren().add(battleshipRectangle);
-				GridPane.setHalignment(battleshipRectangle, HPos.CENTER);
-				GridPane.setValignment(battleshipRectangle, VPos.CENTER);
 				GridPane.setRowIndex(battleshipRectangle, row);
 				GridPane.setColumnIndex(battleshipRectangle, column);
 				shipBox.getChildren().remove(rbBattleship);
@@ -477,8 +488,6 @@ public class BattleshipOnlineClient extends Application
 			else if (ship == destroyer) {
 				destroyerRectangle = destroyer.getRectangle();
 				this.getChildren().add(destroyerRectangle);
-				GridPane.setHalignment(destroyerRectangle, HPos.CENTER);
-				GridPane.setValignment(destroyerRectangle, VPos.CENTER);
 				GridPane.setRowIndex(destroyerRectangle, row);
 				GridPane.setColumnIndex(destroyerRectangle, column);
 				shipBox.getChildren().remove(rbDestroyer);
@@ -488,8 +497,6 @@ public class BattleshipOnlineClient extends Application
 			else if (ship == submarine) {
 				submarineRectangle = submarine.getRectangle();
 				this.getChildren().add(submarineRectangle);
-				GridPane.setHalignment(submarineRectangle, HPos.CENTER);
-				GridPane.setValignment(submarineRectangle, VPos.CENTER);
 				GridPane.setRowIndex(submarineRectangle, row);
 				GridPane.setColumnIndex(submarineRectangle, column);
 				shipBox.getChildren().remove(rbSubmarine);
@@ -499,8 +506,6 @@ public class BattleshipOnlineClient extends Application
 			else if (ship == patrolBoat) {
 				patrolRectangle = patrolBoat.getRectangle();
 				this.getChildren().add(patrolRectangle);
-				GridPane.setHalignment(patrolRectangle, HPos.CENTER);
-				GridPane.setValignment(patrolRectangle, VPos.CENTER);
 				GridPane.setRowIndex(patrolRectangle, row);
 				GridPane.setColumnIndex(patrolRectangle, column);
 				shipBox.getChildren().remove(rbPatrol);
@@ -540,15 +545,29 @@ public class BattleshipOnlineClient extends Application
 			return ship;
 		}
 		
+		protected void paintEnemyShips(Rectangle rectangle) {
+			this.getChildren().add(rectangle);
+		}
+		
 		protected void repaint() {
-			if (ship == null) {
-				enemyGridPane.add(new Text("MISS!"), column, row);
+			if (this.getChildren().isEmpty()) {
+				Marker missMarker = new Marker(row, column, false, new Circle(10));
+				this.getChildren().add(missMarker.getCircle());
+				Platform.runLater(() -> {
+					taLog.appendText("You missed! \n");
+				});
 			}
 			else {
-				enemyGridPane.add(new Text("SUNK!!!"), column, row);
-				shipsToBeSunk.remove(getShip());
+				Marker hitMarker = new Marker(row, column, true, new Circle(10));
+				this.getChildren().add(hitMarker.getCircle());
+				this.getChildren().remove(ship.getRectangle());
+				Platform.runLater(() -> {
+					taLog.appendText("You sunk your enemy's " + ship.getName() + "\n");
+				});
+				shipsToBeSunk.remove(ship);
 			}
 		}
+		
 		/* Handle a mouse click event */
 		private void handleMouseClick() {
 			ContextMenu contextMenu = new ContextMenu();
@@ -557,6 +576,30 @@ public class BattleshipOnlineClient extends Application
 			contextMenu.getItems().add(menuItemFire);
 			contextMenu.getItems().add(menuItemCancel);
 			contextMenu.show(this, 100, 400);
+			
+			if (this.getChildren().contains(enemyCarrierRectangle)) {
+				ship = enemyCarrier;
+			}
+			else if (this.getChildren().contains(enemyBattleshipRectangle)) {
+				ship = enemyBattleship;
+			}
+			else if (this.getChildren().contains(enemyDestroyerRectangle)) {
+				ship = enemyDestroyer;
+			}
+			else if (this.getChildren().contains(enemySubmarineRectangle)) {
+				ship = enemySubmarine;
+			}
+			else if (this.getChildren().contains(enemyPatrolRectangle)) {
+				ship = enemyPatrolBoat;
+			}
+			else if (this.getChildren().isEmpty()) {
+				ship = null;
+			}
+			else {
+				Platform.runLater(() -> {
+					taLog.appendText("You have already fired here \n");
+				});
+			}
 			
 			menuItemFire.setOnAction(e -> {
 				try {
@@ -568,6 +611,34 @@ public class BattleshipOnlineClient extends Application
 				}
 			});
 			menuItemCancel.setOnAction(e -> contextMenu.hide());
+		}
+	}
+	
+	// An inner class for hit/miss markers
+	public class Marker extends Pane {
+		// Indicate row, column,and isHit
+		private int row;
+		private int column;
+		private boolean isHit;
+		private Circle circle;
+		
+		public Marker(int row, int column, boolean isHit, Circle circle) {
+			this.row = row;
+			this.column = column;
+			this.isHit = isHit;
+			this.circle = circle;
+		}
+		
+		public Circle getCircle() {
+			circle.setStroke(Color.BLACK);
+			if (isHit == true) {
+				circle.setFill(Color.RED);
+			}
+			else {
+				circle.setFill(Color.WHITE);
+			}
+			
+			return circle;
 		}
 	}
 	
