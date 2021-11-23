@@ -5,7 +5,7 @@ This project is my final project for the Industry CSCI 1175 Industry Projects co
 I built this program to challenge my understanding and ability to create client-server programs. While I may have fallen short of my original goal, this program still deepened my understanding of GUI and client/server programming, and can still be improved upon in the future.
 ## How to Run
 The minimum files required to run this program are: BattleshipOnlineClient.java, BattleshipOnlineConstants.java, and Ship.java. In the current state of the program, BattleshipOnlineServer.java is also required, but can be tweaked in order to let the clients connect remotely.
-[Clientside Running](RunningDemo.png)
+![Clientside Running](RunningDemo.png)
 ## Code Example
 This code is the two methods used to send and receive ship coordinates to and from the clients. I am particularly proud of this small snippet because it was both challenging, and essential for the current version of the program.
 ```
